@@ -15,7 +15,29 @@ const nav = [['#features','核心能力'],['#workspace','工作台'],['#guide','
 const icons = { extract:'M12 3v11m-4-4 4 4 4-4M4 15v5h16v-5', pack:'M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4 9-4V7m-9 4v10',image:'M3 4h18v16H3zM3 16l6-6 5 5 3-3 4 4M16 8h.01', arrow:'M4 12h16m-6-6 6 6-6 6',ext:'M6 18 18 6M7 6h11v11',moon:'M20 14a8.5 8.5 0 0 1-10-11 9 9 0 1 0 10 11z',sun:'M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',menu:'M3 6h18M3 12h18M3 18h18',close:'m5 5 14 14M19 5 5 19',shield:'m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z',monitor:'M3 4h18v13H3zM8 21h8m-4-4v4',code:'m8 7-5 5 5 5m8-10 5 5-5 5m-3-12-2 14',file:'M5 3h9l5 5v13H5zM14 3v6h5',chevron:'m6 9 6 6 6-6' }
 const alphabet = {A:[14,17,17,31,17,17,17],R:[30,17,17,30,20,18,17],C:[15,16,16,16,16,16,15],H:[17,17,17,31,17,17,17],I:[31,4,4,4,4,4,31],V:[17,17,17,17,17,10,4],E:[31,16,16,30,16,16,31],S:[15,16,16,14,1,1,30],T:[31,4,4,4,4,4,4],U:[17,17,17,17,17,17,14],D:[30,17,17,17,17,17,30],O:[14,17,17,17,17,17,14]}
 const pixels = (word) => [...word].flatMap((c,k) => alphabet[c].flatMap((row,y) => [0,1,2,3,4].map(x => row & (16 >> x) ? `M${k*6+x} ${y}h1v1h-1z` : ''))).join('')
-const dark = ref(false), menu = ref(false), scrolled = ref(false), workspace = ref(null)
+const dark = ref(false), menu = ref(false), scrolled = ref(false), workspace = ref(null), stars = ref(null)
+const STAR_KEY = 'yasuo-stars'
+const starText = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n)
+// Star 数量只用于展示：缓存六小时，失败时保留纯文字入口，不影响页面其他部分。
+function cachedStars() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STAR_KEY) || 'null')
+    if (raw && typeof raw.n === 'number' && Date.now() - raw.t < 6 * 3600e3) return raw.n
+  } catch {}
+  return null
+}
+async function loadStars() {
+  const cached = cachedStars()
+  if (cached !== null) { stars.value = cached; return }
+  try {
+    const res = await fetch('https://api.github.com/repos/arsnyeon/online-unzip-tool', { headers: { Accept: 'application/vnd.github+json' } })
+    if (!res.ok) return
+    const count = (await res.json()).stargazers_count
+    if (typeof count !== 'number') return
+    stars.value = count
+    try { localStorage.setItem(STAR_KEY, JSON.stringify({ n: count, t: Date.now() })) } catch {}
+  } catch {}
+}
 function readMode() {
   const key = new URLSearchParams(location.search).get('mode')
   return key === 'image' ? 'image-compress' : modes.find(m => m.key === key)?.key
@@ -57,12 +79,14 @@ function toggleTheme(){theme(!dark.value);try{localStorage.setItem('yasuo-theme'
 function scroll(){scrolled.value=window.scrollY>12}
 function storage(e){if(e.key==='yasuo-theme')theme(e.newValue==='dark')}
 function key(e){if(e.key==='Escape'&&menu.value){menu.value=false; document.getElementById('menu-toggle')?.focus()}}
-onMounted(()=>{try{theme((localStorage.getItem('yasuo-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark')}catch{}cleanSectionUrl();window.addEventListener('hashchange',cleanSectionUrl);if((initialMode && !location.hash) || location.hash==='#workspace')focusWorkspace();scroll();window.addEventListener('scroll',scroll,{passive:true});window.addEventListener('keydown',key);window.addEventListener('storage',storage)})
+onMounted(()=>{try{theme((localStorage.getItem('yasuo-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark')}catch{}cleanSectionUrl();window.addEventListener('hashchange',cleanSectionUrl);if((initialMode && !location.hash) || location.hash==='#workspace')focusWorkspace();loadStars();scroll();window.addEventListener('scroll',scroll,{passive:true});window.addEventListener('keydown',key);window.addEventListener('storage',storage)})
 onBeforeUnmount(()=>{window.removeEventListener('hashchange',cleanSectionUrl);window.removeEventListener('scroll',scroll);window.removeEventListener('keydown',key);window.removeEventListener('storage',storage)})
 </script>
 <template>
   <svg class="defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
     <symbol v-for="(path,id) in icons" :id="'i-'+id" :key="id" viewBox="0 0 24 24"><path :d="path" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-github" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.6l2.86 5.8 6.4.94-4.63 4.51 1.1 6.38L12 17.2l-5.73 3.03 1.1-6.38-4.63-4.51 6.4-.94z"/></symbol>
     <symbol id="parcel" viewBox="0 0 48 48"><g shape-rendering="crispEdges">
       <path fill="#182950" d="M12 2h16v2h3v3h3v4h5v3h3v3h3v19h-3v3h-5v3h-5v3H14v-2H8v-3H5v-4H3V18h3v-3h4V5h2z"/>
       <path fill="#cadbff" d="M12 6h3V4h12v7h6v7H12z"/><path fill="#fff" d="M15 5h11v7h6v6H14z"/><path fill="#668bf3" d="M27 5h2v3h3v2h-5zM17 8h6v2h-6zm0 5h10v2H17z"/>
@@ -75,7 +99,7 @@ onBeforeUnmount(()=>{window.removeEventListener('hashchange',cleanSectionUrl);wi
   </defs></svg>
   <a class="skip" href="#main">跳到主要内容</a>
   <header :class="{ solid:scrolled || menu }"><div class="shell navrow"><a href="#top" class="brand" @click="menu=false"><svg aria-hidden="true"><use href="#parcel"/></svg><span><b>yasuo</b>.zip</span></a><span class="mini-tag">local first</span>
-    <nav class="wide-nav" aria-label="主导航"><a v-for="[url,label] in nav" :href="url" :key="url" @click="navigate($event,url)">{{label}}</a></nav><div class="nav-actions"><button class="square" @click="toggleTheme" :aria-label="dark?'切换为浅色主题':'切换为深色主题'" :title="dark?'浅色主题':'深色主题'"><svg><use :href="dark?'#i-sun':'#i-moon'"/></svg></button><a class="nav-primary" href="https://github.com/arsnyeon/online-unzip-tool" target="_blank" rel="noreferrer">GitHub <svg aria-hidden="true"><use href="#i-ext"/></svg></a><button id="menu-toggle" class="square menu-toggle" @click="menu=!menu" aria-controls="mobile-nav" :aria-expanded="menu" aria-label="导航菜单"><svg><use :href="menu?'#i-close':'#i-menu'"/></svg></button></div></div>
+    <nav class="wide-nav" aria-label="主导航"><a v-for="[url,label] in nav" :href="url" :key="url" @click="navigate($event,url)">{{label}}</a></nav><div class="nav-actions"><button class="square" @click="toggleTheme" :aria-label="dark?'切换为浅色主题':'切换为深色主题'" :title="dark?'浅色主题':'深色主题'"><svg><use :href="dark?'#i-sun':'#i-moon'"/></svg></button><a class="nav-primary" href="https://github.com/arsnyeon/online-unzip-tool" target="_blank" rel="noreferrer" title="在 GitHub 上查看项目" :aria-label="stars === null ? '在 GitHub 上查看项目' : `在 GitHub 上查看项目，${stars} 个 Star`"><svg class="gh-mark" aria-hidden="true"><use href="#i-github"/></svg><span class="gh-label">GitHub</span><span v-if="stars!==null" class="star-count"><svg aria-hidden="true"><use href="#i-star"/></svg>{{starText(stars)}}<span class="sr-only"> 个 Star</span></span></a><button id="menu-toggle" class="square menu-toggle" @click="menu=!menu" aria-controls="mobile-nav" :aria-expanded="menu" aria-label="导航菜单"><svg><use :href="menu?'#i-close':'#i-menu'"/></svg></button></div></div>
     <nav v-if="menu" id="mobile-nav" aria-label="移动导航"><a v-for="[url,label] in nav" :href="url" :key="url" @click="navigate($event,url)">{{label}}</a><a href="#workspace" @click.prevent="focusWorkspace()">打开工具</a></nav>
   </header>
   <main id="main"><section id="top"><div class="hero shell"><div class="intro">
