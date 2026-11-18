@@ -60,42 +60,51 @@
 
 ## 可以做什么
 
-- **多格式解压**：ZIP / RAR / 7Z / GZ / TAR / BZ2 / XZ，RAR/7Z 加密包可输入密码解压。
-- **文件压缩**：多个文件或整个文件夹打包为 ZIP，保留原有目录结构。
-- **图片压缩**：JPEG / PNG / WebP，质量 10%–100% 可调，批量处理并显示压缩率。
-- **结果浏览**：解压后列出文件路径与大小，支持单个下载或打包下载。
-- **本地隐私**：文件不上传服务器；单文件上限 500MB。
+- **解压**支持 ZIP、RAR、7Z、TAR、GZ、BZ2 和 XZ，也识别 `.tar.gz` / `.tgz`、`.tar.bz2` / `.tbz2`、`.tar.xz` / `.txz`。加密包请先填写密码，兼容性取决于具体的加密方式。
+- **打包**输出 ZIP，保留所选文件及其目录。默认使用标准压缩，照片、视频等已经压缩的数据可以选择「仅打包，不压缩」。
+- **图片压缩**：按质量或目标大小处理 JPEG、PNG、WebP。PNG 不使用有损质量参数；输出没有变小时保留原图。只有明确允许才会缩小尺寸，目标大小不保证一定能达到。
+- **按需下载**：在结果中输入文件名或路径（例如 `docs/`），勾选需要的条目后下载，也可以保存全部。
+- **本地处理**：文件不上传。解压时单包最多 500 MB；打包或处理图片时，整批输入合计最多 500 MB。首次使用部分格式需要联网加载处理组件。
 
 ## 快速开始
 
 可以直接访问线上站点：[https://yasuo.zip/](https://yasuo.zip/)。
 
-本地运行：
+### 本地开发与构建
+
+使用 Node.js 22.12+（或 20.19+）及 npm，在仓库根目录运行：
 
 ```bash
-git clone https://github.com/arsnyeon/online-unzip-tool.git
-cd online-unzip-tool
-python -m http.server 8000
-# 浏览器打开 http://localhost:8000
+npm ci
+npm run dev
 ```
 
-建议通过本地 Web 服务器访问；直接用 `file://` 打开时，浏览器可能阻止 WASM 多格式引擎从 CDN 加载。
+打开终端显示的本地地址。首页右侧的终端窗口就是文件工作区；手机上位于介绍下方。选择模式、处理文件、筛选和下载结果都在同一页完成。分享时可使用 `/?mode=extract#workspace`、`/?mode=compress#workspace` 或 `/?mode=image-compress#workspace` 直达相应模式。
 
-部署：无需构建，把仓库静态文件上传到 GitHub Pages、Netlify、Vercel 等任意静态托管即可。仓库内 `CNAME` 已配置自定义域名 `yasuo.zip`。
+```bash
+npm run build    # 输出到 dist/
+npm run preview  # 通过本地 HTTP 预览生产构建
+```
+
+### 静态部署
+
+部署整个 **`dist/` 目录的内容**，不要直接发布源码目录。首页是唯一入口，构建保留同源 Worker、相对资源 URL 以及 `CNAME`（`yasuo.zip`）。GitHub Pages 可在 Settings → Pages 中选择 **GitHub Actions**，使用仓库中的 `.github/workflows/pages.yml` 工作流；其他静态平台将构建命令设为 `npm run build`，发布目录设为 `dist`。自定义域名仍需在托管平台绑定并配置 DNS。
 
 ## 技术栈
 
-- HTML5 / CSS3 / JavaScript ES6+，零构建。
+- Vue 3 + Vite：项目首页与静态构建。
+- 首页直接挂载工作区，使用浏览器文件 API 和 Canvas，无需后端或 iframe。
 - JSZip 处理 ZIP；pako 处理 GZ；TAR 原生解析。
-- libarchive.js（WASM，经 jsdelivr CDN 按需加载）处理 RAR / 7Z / BZ2 / XZ 和加密包。
-- 通过同源 Worker shim 规避浏览器对跨域 `new Worker()` 的限制。
+- libarchive.js（WASM，经 jsDelivr CDN 加载）处理 RAR / 7Z / BZ2 / XZ 和加密包。Worker 通过同源入口启动。
 
 ## 目录
 
 | 路径 | 内容 |
 | --- | --- |
-| `index.html` | 主页面与工具界面 |
-| `css/style.css` | 视觉系统与响应式样式 |
+| `index.html`、`src/` | Vue 首页入口与组件 |
+| `src/InlineWorkspace.vue` | 首页内的文件处理工作区 |
+| `vite.config.js` | 构建首页并收集静态资源 |
+| `src/home.css` | 首页布局、主题与响应式样式 |
 | `js/script.js` | 全部功能逻辑与 JSDoc 注释 |
 | `js/libarchive-worker-shim.js` | 多格式引擎的同源 Worker 代理 |
 | `docs/assets/` | README 使用的自制 SVG 示意图 |
@@ -103,6 +112,7 @@ python -m http.server 8000
 | `CNAME`、`robots.txt`、`sitemap.xml` | 站点部署与 SEO 配置 |
 | `LICENSE` | MIT 许可证 |
 | `DESIGN.md` | 界面设计契约 |
+| `CHANGELOG.md` | 版本更新记录 |
 | `README.md` | 项目说明 |
 
 ## 常见问题

@@ -1,0 +1,64 @@
+.inline-workspace { padding: 16px; color: var(--text); font: 14px/1.55 system-ui, 'Microsoft YaHei', sans-serif; min-width: 0; container-type: inline-size; }
+.inline-workspace :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-bottom: 1px solid var(--line); gap: 4px; }
+.tool-btn { padding: 9px 2px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--dim); font-size: 13px; }
+.tool-btn.active { border-color: var(--blue); color: var(--accent); font-weight: 650; }
+.tool-btn:hover:not(:disabled), .btn-ghost:hover:not(:disabled) { background: var(--panel2); }
+.zip-method { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: .6rem; color: var(--dim); font-size: 13px; }
+.zip-method select { font: inherit; padding: .4rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+.panel { margin-top: 18px; }
+.panel-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.panel-index { color: var(--muted); font: 12px var(--mono); }
+.panel-head h2 { color: var(--ink); font: 650 17px/1.5 system-ui,sans-serif; letter-spacing: 0; }
+.panel-sub, .image-settings-note, .panel-foot, .file-size { color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.panel-head > div:not(.panel-index) { flex: 1; min-width: 120px; }
+.dropzone { display: grid; justify-items: center; align-content: center; gap: 10px; text-align: center; padding: 18px 12px; border: 1px dashed color-mix(in srgb,var(--muted) 70%,var(--line)); border-radius: 6px; background: var(--panel); }
+.dropzone.drag-over { border: 1px solid var(--blue); background: var(--panel2); }
+.work-icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+.tool-btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.drop-icon { color: var(--accent); }
+.drop-icon svg { width: 28px; height: 28px; }
+.drop-hint { font-weight: 600; color: var(--ink); }
+.action-row, .result-tools, .image-settings, .panel-foot { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.image-compress-buttons, .password-option { flex-direction: column; }
+.password-option { display: flex; gap: 4px; width: min(100%, 280px); text-align: left; font-size: 12px; }
+input:not([type=checkbox],[type=range],[type=file]), select { max-width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--muted); border-radius: 4px; font: inherit; color: var(--ink); background: var(--panel); }
+.btn, .file-list :deep(button) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); background: var(--panel); font: 600 13px/1.4 system-ui,sans-serif; }
+.btn-primary, .btn-download { background: var(--solid); border-color: var(--solid); color: white; }
+.btn-primary:hover:not(:disabled), .btn-download:hover:not(:disabled) { background: color-mix(in srgb,var(--solid) 85%,black); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.image-compress-buttons { width: min(100%, 32rem); }
+.image-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); align-items: start; width: 100%; gap: 6px 16px; font-size: 13px; text-align: left; }
+.image-settings label, .quality-control { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 36px; }
+.image-settings > label:not(.image-resize), .quality-control { justify-content: space-between; }
+.image-settings input[type=number] { width: 7em; }
+.image-resize, .image-skips summary { cursor: pointer; }
+.image-settings input { accent-color: var(--blue); }
+.quality-slider { flex: 1 1 5em; min-width: 4em; width: 5em; }
+.image-settings-note { width: 100%; text-align: left; }
+.image-skips { margin-bottom: 12px; font-size: 13px; }
+.image-skips summary { width: fit-content; padding-block: 4px; font-weight: 600; }
+.image-skips p { max-height: 10rem; overflow: auto; white-space: pre-line; overflow-wrap: anywhere; color: var(--dim); }
+[hidden] { display: none !important; }
+.panel-foot { justify-content: flex-start; gap: 6px 16px; padding-top: 8px; }
+.progress-wrap { display: flex; align-items: center; gap: 10px; }
+.progress-bar-container { height: 6px; flex: 1; background: var(--line); border-radius: 4px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--blue); }
+.result-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; }
+.result-filter input { flex: 1 1 160px; }
+.result-tools { justify-content: flex-start; margin-block: 10px; }
+[data-control=result-status], [data-control=result-empty] { color: var(--dim); font-size: 13px; }
+.file-explorer { margin-block: 8px 12px; border-block: 1px solid var(--line); }
+.file-list-header, .file-list :deep(.file-item) { display: grid; grid-template-columns: minmax(0,1fr) minmax(54px,24%) auto; align-items: center; gap: 8px; padding: 8px 3px; }
+.file-list-header { color: var(--muted); font-size: 12px; }
+.file-list { padding: 0; list-style: none; max-height: 360px; overflow: auto; }
+.file-list :deep(.file-item) { border-top: 1px solid var(--line); }
+.file-list :deep(.file-name) { display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 0; overflow-wrap: anywhere; }
+.file-list :deep(.file-size) { color: var(--dim); font: 12px/1.45 var(--mono); overflow-wrap: anywhere; }
+.file-list :deep(button) { min-height: 32px; font-size: 12px; padding: 4px 8px; }
+.error-popup { margin: auto; width: min(calc(100% - 32px),360px); max-height: 90vh; overflow: auto; padding: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
+.error-popup::backdrop { background: #10182785; }
+.error-content { padding: 20px; }
+.error-content p { white-space: pre-line; overflow-wrap: anywhere; margin-block: 8px 16px; }
+@container (max-width: 340px) { .tool-btn { font-size: 12px; } .file-list-header, .file-list :deep(.file-item) { gap: 4px; } }

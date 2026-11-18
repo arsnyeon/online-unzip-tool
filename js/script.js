@@ -29,12 +29,18 @@
 
 /** 单个文件允许的最大体积（500MB） */
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
+const MAX_ENTRIES = 10000;
+function checkBudget(count, bytes = 0) {
+    if (count > MAX_ENTRIES || bytes > MAX_FILE_SIZE) {
+        throw new RangeError('超过处理上限（10,000 个条目或 500 MB），请使用桌面工具');
+    }
+}
 
 /** 快速通道支持的解压格式（由 JSZip / pako / 原生解析器处理） */
 const FAST_EXTRACT_FORMATS = ['zip', 'gz', 'tar'];
 
 /** 交由 libarchive.js 处理的扩展格式 */
-const LIBARCHIVE_FORMATS = ['rar', '7z', 'bz2', 'xz', 'tgz', 'tbz2', 'txz'];
+const LIBARCHIVE_FORMATS = ['rar', '7z', 'bz2', 'xz', 'tar.gz', 'tar.bz2', 'tar.xz'];
 
 /** 全部支持的解压扩展名（用于上传校验与 accept 属性保持一致） */
 const SUPPORTED_EXTRACT_FORMATS = [...FAST_EXTRACT_FORMATS, ...LIBARCHIVE_FORMATS];
@@ -46,48 +52,52 @@ const LIBARCHIVE_LOAD_TIMEOUT = 15000;
  * DOM 元素缓存
  * ========================================================================== */
 
-/** 页面关键 DOM 节点的集中缓存，避免重复查询 */
+const engineLoads = new Map();
+
+export function mountWorkspace(root, initialMode = 'compress', onModeChange = () => {}) {
+const control = name => root.querySelector(`[data-control="${name}"]`);
+const listeners = new AbortController();
+let disposed = false;
+let generation = 0;
 const elements = {
-    dropArea: document.getElementById('drop-area'),
-    fileInput: document.getElementById('file-input'),
-    uploadBtn: document.getElementById('upload-btn'),
-    uploadSection: document.getElementById('upload-section'),
-    processingSection: document.getElementById('processing-section'),
-    resultSection: document.getElementById('result-section'),
-    progressBar: document.getElementById('progress-bar'),
-    progressText: document.getElementById('progress-text'),
-    processingText: document.getElementById('processing-text'),
-    fileList: document.getElementById('file-list'),
-    fileName: document.getElementById('file-name'),
-    fileSize: document.getElementById('file-size'),
-    resultTitle: document.getElementById('result-title'),
-    downloadAllBtn: document.getElementById('download-all-btn'),
-    errorPopup: document.getElementById('error-popup'),
-    errorMessage: document.getElementById('error-message'),
-    errorClose: document.getElementById('error-close'),
-    compressBtn: document.getElementById('compress-btn'),
-    extractBtn: document.getElementById('extract-btn'),
-    imageCompressBtn: document.getElementById('image-compress-btn'),
-    compressFileInput: document.getElementById('compress-file-input'),
-    compressFilesInput: document.getElementById('compress-files-input'),
-    imageCompressInput: document.getElementById('image-compress-input'),
-    selectFilesBtn: document.getElementById('select-files-btn'),
-    selectFolderBtn: document.getElementById('select-folder-btn'),
-    selectImagesBtn: document.getElementById('select-images-btn'),
-    uploadTitle: document.getElementById('upload-title'),
-    uploadDescription: document.getElementById('upload-description'),
-    uploadButtons: document.getElementById('upload-buttons'),
-    compressButtons: document.getElementById('compress-buttons'),
-    imageCompressButtons: document.getElementById('image-compress-buttons'),
-    passwordOption: document.getElementById('password-option'),
-    archivePassword: document.getElementById('archive-password'),
-    extractIcon: document.getElementById('extract-icon'),
-    compressIcon: document.getElementById('compress-icon'),
-    imageCompressIcon: document.getElementById('image-compress-icon'),
-    qualitySlider: document.getElementById('quality-slider'),
-    qualityValue: document.getElementById('quality-value'),
-    themeToggle: document.getElementById('theme-toggle'),
-    year: document.getElementById('year')
+    dropArea: control('drop-area'),
+    fileInput: control('file-input'),
+    uploadBtn: control('upload-btn'),
+    uploadSection: control('upload-section'),
+    processingSection: control('processing-section'),
+    resultSection: control('result-section'),
+    progressBar: control('progress-bar'),
+    progressText: control('progress-text'),
+    processingText: control('processing-text'),
+    fileList: control('file-list'),
+    fileName: control('file-name'),
+    fileSize: control('file-size'),
+    resultTitle: control('result-title'),
+    downloadAllBtn: control('download-all-btn'),
+    errorPopup: control('error-popup'),
+    errorMessage: control('error-message'),
+    errorClose: control('error-close'),
+    compressBtn: control('compress-btn'),
+    extractBtn: control('extract-btn'),
+    imageCompressBtn: control('image-compress-btn'),
+    compressFileInput: control('compress-file-input'),
+    compressFilesInput: control('compress-files-input'),
+    imageCompressInput: control('image-compress-input'),
+    selectFilesBtn: control('select-files-btn'),
+    selectFolderBtn: control('select-folder-btn'),
+    selectImagesBtn: control('select-images-btn'),
+    uploadTitle: control('upload-title'),
+    uploadDescription: control('upload-description'),
+    uploadButtons: control('upload-buttons'),
+    compressButtons: control('compress-buttons'),
+    imageCompressButtons: control('image-compress-buttons'),
+    passwordOption: control('password-option'),
+    archivePassword: control('archive-password'),
+    extractIcon: control('extract-icon'),
+    compressIcon: control('compress-icon'),
+    imageCompressIcon: control('image-compress-icon'),
+    qualitySlider: control('quality-slider'),
+    qualityValue: control('quality-value')
 };
 
 /* ==========================================================================
@@ -95,13 +105,13 @@ const elements = {
  * ========================================================================== */
 
 /** 当前解压 / 压缩产生的结果文件集合，键为文件路径 */
-let extractedFiles = {};
+let extractedFiles = Object.create(null);
 
 /** 当前正在处理的用户原始文件 */
 let currentFile = null;
 
 /** 当前工作模式：'compress' | 'extract' | 'image-compress' */
-let currentMode = 'compress';
+let currentMode;
 
 /* ==========================================================================
  * 通用工具函数
@@ -259,7 +269,7 @@ function getArchiveType(name) {
  * @returns {Object} 拍平后的文件映射
  */
 function flattenArchiveTree(tree, prefix = '') {
-    const result = {};
+    const result = Object.create(null);
 
     for (const [key, value] of Object.entries(tree)) {
         const path = prefix ? `${prefix}/${key}` : key;
@@ -288,7 +298,16 @@ function flattenArchiveTree(tree, prefix = '') {
  *
  * @param {string} text 处理提示文字
  */
+// Each job owns the shared result list until it finishes; switching modes mid-job
+// would otherwise allow a late completion to overwrite the next job's results.
+function setProcessingBusy(busy) {
+    for (const button of [elements.compressBtn, elements.extractBtn, elements.imageCompressBtn]) {
+        button.disabled = busy;
+    }
+}
+
 function showProcessingUI(text) {
+    setProcessingBusy(true);
     const { uploadSection, processingSection, resultSection, processingText } = elements;
     uploadSection.style.display = 'none';
     processingSection.style.display = 'block';
@@ -303,12 +322,16 @@ function showProcessingUI(text) {
  * @param {string} title 结果区标题
  */
 function showResults(title) {
+    setProcessingBusy(false);
     const { processingSection, resultSection, resultTitle } = elements;
     if (resultTitle) resultTitle.textContent = title;
 
+    resetResultBrowser();
+    resultPaths = Object.keys(extractedFiles).sort();
     displayFiles();
     processingSection.style.display = 'none';
     resultSection.style.display = 'block';
+    if (elements.errorPopup.getAttribute('aria-hidden') !== 'false') resultTitle.focus();
 }
 
 /**
@@ -321,6 +344,7 @@ function updateProgress(percent) {
     const clamped = Math.max(0, Math.min(100, Math.round(percent)));
     progressBar.style.width = clamped + '%';
     progressText.textContent = clamped + '%';
+    progressBar.parentElement.setAttribute('aria-valuenow', String(clamped));
 }
 
 /**
@@ -331,13 +355,17 @@ function updateProgress(percent) {
 function showError(message) {
     const { errorMessage, errorPopup } = elements;
     errorMessage.textContent = message;
-    errorPopup.style.display = 'flex';
+    if (!errorPopup.open) errorPopup.showModal();
+    errorPopup.setAttribute('aria-hidden', 'false');
+    elements.errorClose.focus();
 }
 
 /**
  * 将界面重置为初始的上传状态，并清空所有文件输入框。
  */
 function resetInterface() {
+    setProcessingBusy(false);
+    if (elements.archivePassword) elements.archivePassword.value = '';
     const {
         uploadSection, processingSection, resultSection,
         fileInput, compressFilesInput, compressFileInput, imageCompressInput
@@ -347,10 +375,15 @@ function resetInterface() {
     processingSection.style.display = 'none';
     resultSection.style.display = 'none';
 
+    currentFile = null;
+    extractedFiles = Object.create(null);
+    resetResultBrowser();
     fileInput.value = '';
     if (compressFilesInput) compressFilesInput.value = '';
     if (compressFileInput) compressFileInput.value = '';
     if (imageCompressInput) imageCompressInput.value = '';
+    const imageSkips = control('image-skips');
+    if (imageSkips) imageSkips.hidden = true;
 }
 
 /**
@@ -358,7 +391,10 @@ function resetInterface() {
  *
  * @param {'compress'|'extract'|'image-compress'} mode 目标模式
  */
-function switchMode(mode) {
+function switchMode(requested, notify = false) {
+    const mode = requested === 'image' ? 'image-compress' : ['extract', 'image-compress'].includes(requested) ? requested : 'compress';
+    if (disposed || currentMode === mode) return;
+    generation++;
     currentMode = mode;
     const {
         compressBtn, extractBtn, imageCompressBtn, uploadTitle, uploadDescription,
@@ -385,7 +421,7 @@ function switchMode(mode) {
     // 更新上传区文案与图标
     if (mode === 'compress') {
         uploadTitle.textContent = '选择文件进行压缩';
-        uploadDescription.innerHTML = '拖拽文件到此处上传<br>(支持多种文件格式，最大500MB)';
+        uploadDescription.textContent = '选择多个文件或一个文件夹，合计最多 500 MB。';
         uploadButtons.style.display = 'none';
         compressButtons.style.display = 'flex';
         imageCompressButtons.style.display = 'none';
@@ -394,17 +430,17 @@ function switchMode(mode) {
         imageCompressIcon.style.display = 'none';
     } else if (mode === 'extract') {
         uploadTitle.textContent = '选择压缩文件进行解压';
-        uploadDescription.innerHTML = '拖拽压缩文件到此处上传<br>(支持ZIP/RAR/7Z/GZ/TAR/BZ2/XZ，最大500MB)';
+        uploadDescription.textContent = '一次选择一个压缩包，最多 500 MB。加密文件请先填写密码。';
         uploadButtons.style.display = 'flex';
         compressButtons.style.display = 'none';
         imageCompressButtons.style.display = 'none';
         extractIcon.style.display = 'block';
         compressIcon.style.display = 'none';
         imageCompressIcon.style.display = 'none';
-        fileInput.accept = '.zip,.rar,.7z,.gz,.tar,.bz2,.xz,.tgz,.tar.gz,.tar.bz2,.tar.xz';
+        fileInput.accept = '.zip,.rar,.7z,.gz,.tar,.bz2,.xz,.tgz,.tbz2,.txz,.tar.gz,.tar.bz2,.tar.xz';
     } else if (mode === 'image-compress') {
         uploadTitle.textContent = '选择图片进行压缩';
-        uploadDescription.innerHTML = '拖拽图片到此处上传<br>(支持JPG、PNG、WebP格式，最大500MB)';
+        uploadDescription.textContent = '选择 JPEG、PNG 或 WebP 图片，整批最多 500 MB。';
         uploadButtons.style.display = 'none';
         compressButtons.style.display = 'none';
         imageCompressButtons.style.display = 'flex';
@@ -414,6 +450,7 @@ function switchMode(mode) {
     }
 
     resetInterface();
+    if (notify) onModeChange(mode);
 }
 
 /* ==========================================================================
@@ -453,14 +490,16 @@ function handleFiles(files) {
  * @param {File} file 待解压文件
  */
 async function extractArchive(file) {
+    const job = generation;
     try {
-        extractedFiles = {};
+        extractedFiles = Object.create(null);
         const type = getArchiveType(file.name);
-        const password = elements.archivePassword?.value?.trim() || '';
+        const password = elements.archivePassword?.value || '';
 
         switch (type) {
             case 'zip':
-                await extractZip(file);
+                if (password) await extractWithLibArchive(file, password);
+                else await extractZip(file);
                 break;
             case 'gz':
                 await extractGzip(file);
@@ -473,8 +512,11 @@ async function extractArchive(file) {
                 await extractWithLibArchive(file, password);
         }
 
+        if (job !== generation) return;
+
         showResults('解压结果');
     } catch (error) {
+        if (job !== generation) return;
         console.error('解压失败:', error);
         showError('解压失败: ' + error.message);
         resetInterface();
@@ -487,13 +529,19 @@ async function extractArchive(file) {
  * @param {File} file 待解压的 ZIP 文件
  */
 async function extractZip(file) {
+    const job = generation;
     try {
+        const JSZip = await getZipEngine();
         const zip = await new JSZip().loadAsync(file, {
             decodeFileName: smartDecodeFileName
         });
 
+        if (job !== generation) return;
+
         const entries = Object.entries(zip.files);
         const total = entries.length;
+        checkBudget(total, entries.reduce((sum, [, entry]) => sum + (entry._data?.uncompressedSize || 0), 0));
+        let expanded = 0;
 
         for (let i = 0; i < total; i++) {
             const [path, zipEntry] = entries[i];
@@ -501,6 +549,9 @@ async function extractZip(file) {
             // 目录项直接跳过
             if (!zipEntry.dir) {
                 const content = await zipEntry.async('blob');
+                if (job !== generation) return;
+                expanded += content.size;
+                checkBudget(total, expanded);
                 extractedFiles[path] = {
                     name: path.split('/').pop(),
                     path: path,
@@ -513,6 +564,7 @@ async function extractZip(file) {
             updateProgress(((i + 1) / total) * 100);
         }
     } catch (error) {
+        if (error instanceof RangeError) throw error;
         console.error('ZIP解压失败:', error);
         throw new Error('ZIP解压失败，请确认文件完好或输入正确密码');
     }
@@ -524,13 +576,22 @@ async function extractZip(file) {
  * @param {File} file 待解压的 GZ 文件
  */
 async function extractGzip(file) {
+    const job = generation;
     try {
-        if (typeof pako === 'undefined') {
-            throw new Error('GZIP 解压库未加载，请刷新页面重试');
-        }
+        const pako = await loadEngine('pako', 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js');
 
         const compressed = new Uint8Array(await file.arrayBuffer());
-        const decompressed = pako.ungzip(compressed);
+        if (job !== generation) return;
+        const inflater = new pako.Inflate();
+        const chunks = [];
+        let expanded = 0;
+        inflater.onData = chunk => {
+            expanded += chunk.length;
+            checkBudget(1, expanded);
+            chunks.push(chunk);
+        };
+        inflater.push(compressed, true);
+        if (inflater.err || !inflater.ended) throw new Error('GZIP 数据不完整');
 
         // 去掉 .gz 后缀还原原始文件名
         let originalName = file.name;
@@ -538,7 +599,7 @@ async function extractGzip(file) {
             originalName = originalName.slice(0, -3);
         }
 
-        const blob = new Blob([decompressed]);
+        const blob = new Blob(chunks);
         extractedFiles[originalName] = {
             name: originalName,
             path: originalName,
@@ -549,6 +610,7 @@ async function extractGzip(file) {
 
         updateProgress(100);
     } catch (error) {
+        if (error instanceof RangeError) throw error;
         console.error('GZIP解压失败:', error);
         throw new Error('GZIP解压失败，可能是文件损坏或格式不支持');
     }
@@ -562,10 +624,13 @@ async function extractGzip(file) {
  * @param {File} file 待解压的 TAR 文件
  */
 async function extractTar(file) {
+    const job = generation;
     try {
         const arrayBuffer = await file.arrayBuffer();
+        if (job !== generation) return;
         const view = new DataView(arrayBuffer);
         let offset = 0;
+        let count = 0;
 
         while (offset < arrayBuffer.byteLength - 512) {
             // 连续 512 个零字节表示归档结束
@@ -577,6 +642,7 @@ async function extractTar(file) {
                 }
             }
             if (isEnd) break;
+            checkBudget(++count);
 
             // 头部前 100 字节是文件名（智能编码解码）
             const nameBytes = new Uint8Array(100);
@@ -597,14 +663,16 @@ async function extractTar(file) {
                 if (byte === 0 || byte === 32) break;
                 sizeStr += String.fromCharCode(byte);
             }
-            const fileSize = parseInt(sizeStr.trim(), 8) || 0;
+            if (!/^[0-7]+$/.test(sizeStr.trim())) throw new Error('无效的文件大小');
+            const fileSize = parseInt(sizeStr.trim(), 8);
+            if (offset + 512 + fileSize > file.size) throw new Error('文件内容不完整');
 
             // 156 字节是文件类型标识（0 / '0' 表示普通文件）
             const fileType = view.getUint8(offset + 156);
             offset += 512; // 跳过头部块
 
             // 仅提取有内容的普通文件，跳过目录项
-            if (fileSize > 0 && !fileName.endsWith('/') && (fileType === 0 || fileType === 48)) {
+            if (!fileName.endsWith('/') && (fileType === 0 || fileType === 48)) {
                 const fileData = new Uint8Array(arrayBuffer.slice(offset, offset + fileSize));
                 const blob = new Blob([fileData]);
                 extractedFiles[fileName] = {
@@ -626,27 +694,41 @@ async function extractTar(file) {
         }
         updateProgress(100);
     } catch (error) {
+        if (error instanceof RangeError) throw error;
         console.error('TAR解压失败:', error);
         throw new Error('TAR解压失败，可能是文件损坏或格式不支持');
     }
 }
 
-/**
- * 等待 libarchive.js（WASM 引擎）加载完成。
- *
- * 由于引擎通过 CDN 以 ES Module 异步加载，这里采用轮询方式等待就绪。
- *
- * @returns {Promise<Object>} libarchive 的 Archive 类
- */
-async function waitForLibArchive() {
-    const start = Date.now();
-    while (!window.LibArchive) {
-        if (Date.now() - start > LIBARCHIVE_LOAD_TIMEOUT) {
-            throw new Error('多格式解压引擎加载超时，请检查网络后重试');
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
+// Download only the engine needed by the selected operation. No external
+// resource must block mode selection, password input, or the native TAR reader.
+
+function loadEngine(name, url) {
+    if (window[name]) return Promise.resolve(window[name]);
+    if (!engineLoads.has(name)) {
+        engineLoads.set(name, new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.crossOrigin = 'anonymous';
+            const fail = () => {
+                clearTimeout(timer);
+                script.remove();
+                engineLoads.delete(name);
+                reject(new Error('处理引擎未加载，请检查网络并重试'));
+            };
+            const timer = setTimeout(fail, LIBARCHIVE_LOAD_TIMEOUT);
+            script.onerror = fail;
+            script.onload = () => { clearTimeout(timer); resolve(window[name]); };
+            document.head.appendChild(script);
+        }));
     }
-    return window.LibArchive;
+    return engineLoads.get(name);
+}
+const getZipEngine = () => loadEngine('JSZip', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+async function waitForLibArchive() {
+    const { Archive } = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/libarchive.js@2.0.2/dist/libarchive.js');
+    Archive.init({ workerUrl: new URL('js/libarchive-worker-shim.js', document.baseURI).href });
+    return Archive;
 }
 
 /**
@@ -658,6 +740,7 @@ async function waitForLibArchive() {
  * @param {string} password 用户输入的解压密码，可为空
  */
 async function extractWithLibArchive(file, password) {
+    const job = generation;
     const Archive = await waitForLibArchive();
     const archive = await Archive.open(file);
 
@@ -671,8 +754,10 @@ async function extractWithLibArchive(file, password) {
         let totalEntries = 0;
         try {
             const filesArray = await archive.getFilesArray();
+            checkBudget(filesArray.length, filesArray.reduce((sum, item) => sum + (Number(item.file?.size) || 0), 0));
             totalEntries = filesArray.filter(item => item.file && item.file.size > 0).length;
         } catch (error) {
+            if (error instanceof RangeError) throw error;
             // 部分格式不支持预列举，回落为不确定进度的平滑递增
             console.warn('无法预取文件列表，进度将以递增方式显示:', error);
         }
@@ -680,7 +765,7 @@ async function extractWithLibArchive(file, password) {
         let extractedCount = 0;
         const tree = await archive.extractFiles((entry) => {
             // 单文件解压完成回调：即时反馈进度
-            if (entry && entry.path) {
+            if (job === generation && entry && entry.path) {
                 extractedCount++;
                 const percent = totalEntries > 0
                     ? (extractedCount / totalEntries) * 100
@@ -688,6 +773,8 @@ async function extractWithLibArchive(file, password) {
                 updateProgress(Math.min(99, percent));
             }
         });
+
+        if (job !== generation) return;
 
         extractedFiles = flattenArchiveTree(tree);
         updateProgress(100);
@@ -713,6 +800,7 @@ async function extractWithLibArchive(file, password) {
  * @param {FileList} files 待压缩的文件列表
  */
 function handleCompressFiles(files) {
+    if (files.length > MAX_ENTRIES) return showError('每批最多 10,000 个条目');
     const totalSize = Array.from(files).reduce((sum, file) => sum + file.size, 0);
 
     if (totalSize > MAX_FILE_SIZE) {
@@ -727,32 +815,45 @@ function handleCompressFiles(files) {
 /**
  * 将多个文件 / 文件夹压缩为 ZIP。
  *
- * 保留文件夹的相对路径结构，并在包内附加说明文本。
+ * 仅打包所选文件，保留文件夹的相对路径结构。
  *
  * @param {FileList} files 待压缩的文件列表
  */
 async function compressFiles(files) {
+    const job = generation;
     try {
+        // FileList 可能随文件选择框重置而改变，在异步操作前固定本次选择。
+        files = Array.from(files);
+        const paths = new Set();
+        const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+        const entries = files.map(file => {
+            const path = file.webkitRelativePath || file.name;
+            if (paths.has(path)) throw new Error(`文件路径重复：${path}。请重命名后再试。`);
+            paths.add(path);
+            return { file, path };
+        });
+
+        const JSZip = await getZipEngine();
         const zip = new JSZip();
-        const total = files.length;
-
-        for (let i = 0; i < total; i++) {
-            const file = files[i];
-            const filePath = file.webkitRelativePath || file.name;
-            const content = await readFileAsArrayBuffer(file);
-
-            zip.file(filePath, content);
-            updateProgress(((i + 1) / total) * 100);
+        let bytesRead = 0;
+        for (const { file, path } of entries) {
+            const content = await readFileAsArrayBuffer(file, loaded => {
+                if (job === generation && totalBytes) updateProgress(50 * (bytesRead + loaded) / totalBytes);
+            });
+            if (job !== generation) return;
+            zip.file(path, content, { createFolders: false });
+            bytesRead += file.size;
+            updateProgress(totalBytes ? 50 * bytesRead / totalBytes : 50);
         }
 
-        zip.file('在线解压缩工具(yasuo.zip).txt',
-            '本压缩包由【在线解压缩工具yasuo.zip】在线压缩，感谢您的使用！');
-
+        const storeOnly = control('zip-method')?.value === 'store';
         const zipBlob = await zip.generateAsync({
             type: 'blob',
-            compression: 'DEFLATE',
-            compressionOptions: { level: 6 }
-        });
+            compression: storeOnly ? 'STORE' : 'DEFLATE',
+            ...(storeOnly ? {} : { compressionOptions: { level: 6 } })
+        }, ({ percent }) => job === generation && updateProgress(Math.min(99, 50 + percent / 2)));
+        if (job !== generation) return;
+        updateProgress(100);
 
         // 单文件用原文件名，多文件 / 文件夹统一用 yasuo.zip
         const zipName = (files.length === 1 && !files[0].webkitRelativePath)
@@ -770,6 +871,7 @@ async function compressFiles(files) {
         elements.fileSize.textContent = formatFileSize(zipBlob.size);
         showResults('压缩结果');
     } catch (error) {
+        if (job !== generation) return;
         console.error('压缩失败:', error);
         showError('压缩失败: ' + error.message);
         resetInterface();
@@ -780,13 +882,16 @@ async function compressFiles(files) {
  * 以 ArrayBuffer 形式读取文件。
  *
  * @param {File} file 待读取文件
+ * @param {(loaded: number) => void} onProgress 已读取字节数回调
  * @returns {Promise<ArrayBuffer>} 文件内容
  */
-function readFileAsArrayBuffer(file) {
+function readFileAsArrayBuffer(file, onProgress) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
+        reader.onprogress = event => onProgress(event.loaded);
         reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
+        reader.onerror = () => reject(reader.error || new Error(`无法读取文件：${file.name}`));
+        reader.onabort = () => reject(new Error(`读取已取消：${file.name}`));
         reader.readAsArrayBuffer(file);
     });
 }
@@ -801,6 +906,8 @@ function readFileAsArrayBuffer(file) {
  * @param {FileList} files 待压缩的图片文件列表
  */
 function handleImageCompressFiles(files) {
+    try { checkBudget(files.length, Array.from(files).reduce((sum, file) => sum + file.size, 0)); }
+    catch (error) { return showError(error.message); }
     const validFiles = [];
     const skipped = [];
     const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -821,17 +928,15 @@ function handleImageCompressFiles(files) {
     }
 
     if (validFiles.length === 0) {
-        showError('没有找到有效的图片文件\n支持的格式：JPG、PNG、WebP');
+        showError(`没有可下载的图片。请选择可读取的 JPG、PNG 或 WebP 文件。\n${skipped.join('\n')}`);
         return;
     }
 
-    // 部分文件被跳过时给出汇总提示，但不阻断有效文件处理
-    if (skipped.length > 0) {
-        showError(`已跳过 ${skipped.length} 个无效文件：\n${skipped.join('\n')}\n\n有效文件将正常处理`);
-    }
-
+    let options;
+    try { options = readImageOptions(); }
+    catch (error) { return showError(error.message); }
     showProcessingUI('正在压缩图片...');
-    compressImages(validFiles);
+    return compressImages(validFiles, options, skipped);
 }
 
 /**
@@ -839,21 +944,35 @@ function handleImageCompressFiles(files) {
  *
  * @param {Array<File>} files 有效的图片文件数组
  */
-async function compressImages(files) {
+async function compressImages(files, options, skipped = []) {
+    const job = generation;
     try {
-        const quality = parseInt(elements.qualitySlider.value, 10) / 100;
         const total = files.length;
-        extractedFiles = {};
+        extractedFiles = Object.create(null);
 
         for (let i = 0; i < total; i++) {
             const file = files[i];
-            const blob = await compressImage(file, quality);
+            let blob;
+            try {
+                blob = await compressImage(file, options);
+            } catch (error) {
+                if (job !== generation) return;
+                skipped.push(`${file.name}（${error.message || '无法处理此图片'}）`);
+            }
+            if (job !== generation) return;
+            updateProgress(((i + 1) / total) * 100);
+            if (!blob) continue;
 
             // 生成带标识的新文件名，避免覆盖原文件
             const dotIndex = file.name.lastIndexOf('.');
             const nameWithoutExt = dotIndex > 0 ? file.name.slice(0, dotIndex) : file.name;
             const ext = dotIndex > 0 ? file.name.slice(dotIndex) : '';
-            const compressedName = `${nameWithoutExt}(yasuo.zip)${ext}`;
+            const base = blob === file ? nameWithoutExt : `${nameWithoutExt}(yasuo.zip)`;
+            let compressedName = base + ext;
+            for (let n = 2; compressedName in extractedFiles; n++) compressedName = `${base} (${n})${ext}`;
+            const saved = file.size - blob.size;
+            const targetStatus = options.targetBytes ? (blob.size <= options.targetBytes ? ' · 已达到目标' : ' · 未达到目标') : '';
+            const savingsText = `${formatFileSize(file.size)} → ${formatFileSize(blob.size)} · 节省 ${formatFileSize(saved)}（${file.size ? (100 * saved / file.size).toFixed(1) : 0}%）${blob === file ? ' · 保留原图' : ''}${targetStatus}`;
 
             extractedFiles[compressedName] = {
                 name: compressedName,
@@ -862,79 +981,169 @@ async function compressImages(files) {
                 type: blob.type,
                 content: blob,
                 originalSize: file.size,
-                compressionRatio: ((file.size - blob.size) / file.size * 100).toFixed(1)
+                savingsText
             };
-
-            updateProgress(((i + 1) / total) * 100);
         }
 
-        const totalOriginal = files.reduce((sum, file) => sum + file.size, 0);
-        const totalCompressed = Object.values(extractedFiles).reduce((sum, file) => sum + file.size, 0);
-        const ratio = ((totalOriginal - totalCompressed) / totalOriginal * 100).toFixed(1);
+        const results = Object.values(extractedFiles);
+        if (!results.length) {
+            resetInterface();
+            showError(`没有可下载的图片，已跳过 ${skipped.length} 个文件。请检查原图后重试。\n${skipped.join('\n')}`);
+            return;
+        }
+        const totalOriginal = results.reduce((sum, file) => sum + file.originalSize, 0);
+        const totalCompressed = results.reduce((sum, file) => sum + file.size, 0);
+        const savings = totalOriginal - totalCompressed;
+        const ratio = totalOriginal ? (100 * savings / totalOriginal).toFixed(1) : '0';
 
-        elements.fileName.textContent = `${files.length}个图片文件 (压缩率: ${ratio}%)`;
-        elements.fileSize.textContent = `${formatFileSize(totalCompressed)} (原始: ${formatFileSize(totalOriginal)})`;
+        elements.fileName.textContent = `已处理 ${results.length} 张图片 · 节省 ${formatFileSize(savings)}（${ratio}%）`;
+        elements.fileSize.textContent = `${formatFileSize(totalOriginal)} → ${formatFileSize(totalCompressed)}`;
+        const report = control('image-skips');
+        report.hidden = !skipped.length;
+        report.open = skipped.length > 0;
+        control('image-skips-count').textContent = `已跳过 ${skipped.length} 个文件`;
+        control('image-skips-list').textContent = skipped.join('\n');
         showResults('图片压缩结果');
     } catch (error) {
+        if (job !== generation) return;
         console.error('图片压缩失败:', error);
         showError('图片压缩失败: ' + error.message);
         resetInterface();
     }
 }
 
-/**
- * 使用 Canvas 压缩单张图片，输出格式与原格式一致。
- *
- * @param {File} file 图片文件
- * @param {number} quality 压缩质量（0-1）
- * @returns {Promise<Blob>} 压缩后的图片 Blob
- */
-function compressImage(file, quality) {
-    return new Promise((resolve, reject) => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+function syncImageOptions() {
+    const mode = control('image-target').value;
+    control('image-custom-row').hidden = mode !== 'custom';
+    control('image-quality-row').hidden = mode !== 'manual';
+    control('image-edge-row').hidden = !control('image-resize').checked;
+}
+
+function readImageOptions() {
+    const integer = (value, max, label) => {
+        const n = Number(value);
+        if (!Number.isInteger(n) || n < 1 || n > max) throw new Error(`${label}须为 1 至 ${max} 的整数`);
+        return n;
+    };
+    const mode = control('image-target').value;
+    const kb = mode === 'manual' ? 0 : integer(mode === 'custom' ? control('image-custom-kb').value : mode, 512000, '目标体积（KB）');
+    return {
+        targetBytes: kb * 1024,
+        quality: Number(elements.qualitySlider.value) / 100,
+        maxEdge: control('image-resize').checked ? integer(control('image-max-edge').value, 16384, '最长边（像素）') : 0
+    };
+}
+
+async function compressImage(file, { quality, targetBytes, maxEdge }) {
+    const url = URL.createObjectURL(file);
+    const canvas = document.createElement('canvas');
+    try {
         const img = new Image();
-
-        img.onload = function () {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-
-            // 保持原始格式，仅 JPEG/WebP 对质量参数敏感
-            let outputFormat = 'image/jpeg';
-            if (file.type === 'image/png') outputFormat = 'image/png';
-            else if (file.type === 'image/webp') outputFormat = 'image/webp';
-
-            canvas.toBlob(
-                (blob) => (blob ? resolve(blob) : reject(new Error('图片压缩失败'))),
-                outputFormat,
-                quality
-            );
-            URL.revokeObjectURL(img.src);
-        };
-
-        img.onerror = () => {
-            URL.revokeObjectURL(img.src);
-            reject(new Error('图片加载失败'));
-        };
-
-        img.src = URL.createObjectURL(file);
-    });
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = () => reject(new Error('图片加载失败'));
+            img.src = url;
+        });
+        if (img.width * img.height > 40000000) throw new Error('图片超过 4000 万像素，请使用桌面工具');
+        const scale = maxEdge ? Math.min(1, maxEdge / Math.max(img.width, img.height)) : 1;
+        if (targetBytes && file.size <= targetBytes && scale === 1) return file;
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('浏览器无法创建画布');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const format = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
+        const encode = q => new Promise((resolve, reject) => canvas.toBlob(blob => {
+            if (!blob) reject(new Error('图片编码失败'));
+            else resolve(blob.type === format ? blob : file);
+        }, format, q));
+        let best;
+        if (format === 'image/png' || !targetBytes) {
+            best = await encode(format === 'image/png' ? undefined : quality);
+        } else {
+            // 先确认质量边界，再寻找符合体积限制的最高整数质量。
+            best = await encode(1);
+            if (best.size > targetBytes) {
+                const floor = await encode(0.01);
+                if (floor.size < best.size) best = floor;
+                if (floor.size <= targetBytes) {
+                    let low = 2, high = 99;
+                    while (low <= high) {
+                        const mid = Math.floor((low + high) / 2);
+                        const trial = await encode(mid / 100);
+                        if (trial.size <= targetBytes) { best = trial; low = mid + 1; }
+                        else high = mid - 1;
+                    }
+                }
+            }
+        }
+        return best.size < file.size ? best : file;
+    } finally {
+        canvas.width = canvas.height = 0;
+        URL.revokeObjectURL(url);
+    }
 }
 
 /* ==========================================================================
  * 结果展示与下载
  * ========================================================================== */
 
-/**
- * 渲染处理结果文件列表。
- */
-function displayFiles() {
-    const { fileList } = elements;
-    fileList.innerHTML = '';
+const resultControl = control;
+const selectedPaths = new Set();
+let resultPaths = [];
+let visiblePaths = [];
+let resultDownloadBusy = false;
 
-    Object.keys(extractedFiles).sort().forEach(path => {
-        fileList.appendChild(createFileItem(extractedFiles[path]));
+function resetResultBrowser() {
+    selectedPaths.clear();
+    resultPaths = [];
+    visiblePaths = [];
+    resultDownloadBusy = false;
+    resultControl('result-search').value = '';
+    elements.fileList.textContent = '';
+}
+
+function updateResultControls() {
+    resultControl('result-status').textContent = `显示 ${visiblePaths.length} / ${resultPaths.length} 个文件 · 已选 ${selectedPaths.size} 个`;
+    resultControl('select-visible-btn').disabled = visiblePaths.every(path => selectedPaths.has(path));
+    resultControl('clear-selection-btn').disabled = !selectedPaths.size;
+    resultControl('download-selected-btn').disabled = !selectedPaths.size || resultDownloadBusy;
+    elements.downloadAllBtn.disabled = !resultPaths.length || resultDownloadBusy;
+}
+
+function displayFiles() {
+    const query = resultControl('result-search').value.trim().toLowerCase();
+    visiblePaths = resultPaths.filter(path => path.toLowerCase().includes(query));
+    const rows = document.createDocumentFragment();
+    for (const path of visiblePaths) rows.appendChild(createFileItem(extractedFiles[path]));
+    elements.fileList.replaceChildren(rows);
+    resultControl('result-empty').hidden = visiblePaths.length !== 0;
+    resultControl('result-empty-text').textContent = resultPaths.length ? '没有匹配此路径的文件。' : '本次处理没有可下载的文件。';
+    resultControl('reset-search-btn').hidden = !resultPaths.length;
+    updateResultControls();
+}
+
+function bindResultControls() {
+    const search = resultControl('result-search');
+    listen(search, 'input', displayFiles);
+    listen(resultControl('reset-search-btn'), 'click', () => {
+        search.value = '';
+        displayFiles();
+        search.focus();
+    });
+    listen(resultControl('select-visible-btn'), 'click', () => {
+        for (const path of visiblePaths) selectedPaths.add(path);
+        displayFiles();
+    });
+    listen(resultControl('clear-selection-btn'), 'click', () => {
+        selectedPaths.clear();
+        displayFiles();
+    });
+    listen(resultControl('download-selected-btn'), 'click', () => downloadResultPaths([...selectedPaths], true));
+    listen(resultControl('new-task-btn'), 'click', () => {
+        resetInterface();
+        const trigger = currentMode === 'extract' ? elements.uploadBtn : currentMode === 'compress' ? elements.selectFilesBtn : elements.selectImagesBtn;
+        trigger.focus();
     });
 }
 
@@ -947,11 +1156,19 @@ function displayFiles() {
  * @returns {HTMLElement} 文件列表项节点
  */
 function createFileItem(file) {
-    const fileItem = document.createElement('div');
+    const fileItem = document.createElement('li');
     fileItem.className = 'file-item';
 
-    // 文件名列
-    const nameCell = document.createElement('div');
+    const selection = document.createElement('input');
+    selection.type = 'checkbox';
+    selection.checked = selectedPaths.has(file.path);
+    selection.addEventListener('change', () => {
+        if (selection.checked) selectedPaths.add(file.path);
+        else selectedPaths.delete(file.path);
+        updateResultControls();
+    });
+    // The wrapping label exposes the complete path to keyboard and screen-reader users.
+    const nameCell = document.createElement('label');
     nameCell.className = 'file-name';
     const icon = document.createElement('i');
     icon.className = getFileIcon(file.name);
@@ -959,24 +1176,18 @@ function createFileItem(file) {
     const nameText = document.createElement('span');
     nameText.textContent = file.path;
     nameText.title = file.path;
-    nameCell.append(icon, nameText);
+    nameCell.append(selection, icon, nameText);
 
-    // 大小列（图片压缩结果附带压缩率）
     const sizeCell = document.createElement('div');
     sizeCell.className = 'file-size';
-    sizeCell.textContent = formatFileSize(file.size);
-    if (file.originalSize && file.compressionRatio) {
-        const ratio = document.createElement('small');
-        ratio.style.color = 'var(--secondary-color)';
-        ratio.textContent = ` (-${file.compressionRatio}%)`;
-        sizeCell.appendChild(ratio);
-    }
+    sizeCell.textContent = file.savingsText || formatFileSize(file.size);
 
     // 操作列：通过事件监听器绑定下载，避免内联 onclick 的路径引号问题
     const actionCell = document.createElement('div');
     actionCell.className = 'file-action';
     const downloadBtn = document.createElement('button');
     downloadBtn.type = 'button';
+    downloadBtn.setAttribute('aria-label', `下载 ${file.path}`);
     const btnIcon = document.createElement('i');
     btnIcon.className = 'fas fa-download';
     btnIcon.setAttribute('aria-hidden', 'true');
@@ -998,36 +1209,48 @@ function downloadFile(file) {
     const a = document.createElement('a');
     a.href = url;
     a.download = file.name;
-    document.body.appendChild(a);
+    root.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    a.remove();
     URL.revokeObjectURL(url);
 }
 
 /**
  * 下载全部结果文件。单个文件直接下载，多个文件打包为 ZIP。
  */
-async function downloadAllFiles() {
+function downloadAllFiles() {
+    return downloadResultPaths(resultPaths, false);
+}
+
+async function downloadResultPaths(paths, selectedOnly) {
+    if (!paths.length || resultDownloadBusy) return;
+    const files = extractedFiles;
+    if (paths.length === 1 && (!selectedOnly || !/[\\/]/.test(paths[0]))) {
+        downloadFile(files[paths[0]]);
+        return;
+    }
+    resultDownloadBusy = true;
+    updateResultControls();
+    const baseName = currentFile?.name.replace(/\.[^/.]+$/, '') || 'files';
     try {
-        const keys = Object.keys(extractedFiles);
-        if (keys.length === 0) return;
-
-        if (keys.length === 1) {
-            downloadFile(extractedFiles[keys[0]]);
-            return;
-        }
-
+        const JSZip = await getZipEngine();
+        if (files !== extractedFiles) return;
         const zip = new JSZip();
-        keys.forEach(path => zip.file(path, extractedFiles[path].content));
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-        const zipName = currentFile
-            ? currentFile.name.replace(/\.[^/.]+$/, '') + '_extracted.zip'
-            : 'files.zip';
-        downloadFile({ name: zipName, content: zipBlob });
+        for (const path of paths) {
+            if (/^[\\/]|^[a-z]:|[\x00-\x1f]/i.test(path) || path.split(/[\\/]/).includes('..')) {
+                throw new Error('文件路径不安全，请单独下载该文件');
+            }
+            zip.file(path, files[path].content, { createFolders: false });
+        }
+        const content = await zip.generateAsync({ type: 'blob' });
+        if (files === extractedFiles) downloadFile({ name: baseName + (selectedOnly ? '_selected.zip' : '_extracted.zip'), content });
     } catch (error) {
-        console.error('创建ZIP失败:', error);
-        showError('创建ZIP失败: ' + error.message);
+        if (files === extractedFiles) showError('创建 ZIP 失败：' + error.message);
+    } finally {
+        if (files === extractedFiles) {
+            resultDownloadBusy = false;
+            updateResultControls();
+        }
     }
 }
 
@@ -1038,6 +1261,10 @@ async function downloadAllFiles() {
 /**
  * 集中绑定页面所有交互事件。
  */
+function listen(node, event, handler) {
+    node?.addEventListener(event, handler, { signal: listeners.signal });
+}
+
 function initEventListeners() {
     const {
         dropArea, fileInput, uploadBtn, downloadAllBtn, errorClose,
@@ -1048,79 +1275,47 @@ function initEventListeners() {
     } = elements;
 
     // 上传按钮：仅解压模式使用
-    uploadBtn.addEventListener('click', () => {
+    listen(uploadBtn, 'click', () => {
         if (currentMode === 'extract') fileInput.click();
     });
-    fileInput.addEventListener('change', handleFileSelect);
+    listen(fileInput, 'change', handleFileSelect);
 
     // 拖拽上传
     ['dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, handleDragEvent);
+        listen(dropArea, eventName, handleDragEvent);
     });
 
     // 点击上传区空白处触发选择（图片模式仅支持拖拽 / 按钮）
-    dropArea.addEventListener('click', (e) => {
-        if (e.target.tagName !== 'BUTTON' && !e.target.closest('button') && currentMode === 'extract') {
+    listen(dropArea, 'click', (e) => {
+        if (!e.target.closest('button, input, label, .password-option') && currentMode === 'extract') {
             fileInput.click();
         }
     });
 
     // 通用按钮
-    downloadAllBtn.addEventListener('click', downloadAllFiles);
-    errorClose.addEventListener('click', () => { elements.errorPopup.style.display = 'none'; });
+    bindResultControls();
+    listen(downloadAllBtn, 'click', downloadAllFiles);
+    listen(errorClose, 'click', () => elements.errorPopup.close());
+    listen(elements.errorPopup, 'close', () => elements.errorPopup.setAttribute('aria-hidden', 'true'));
 
     // 模式切换按钮
-    compressBtn?.addEventListener('click', () => switchMode('compress'));
-    extractBtn?.addEventListener('click', () => switchMode('extract'));
-    imageCompressBtn?.addEventListener('click', () => switchMode('image-compress'));
+    listen(compressBtn, 'click', () => switchMode('compress', true));
+    listen(extractBtn, 'click', () => switchMode('extract', true));
+    listen(imageCompressBtn, 'click', () => switchMode('image-compress', true));
 
     // 文件 / 文件夹 / 图片选择按钮
-    selectFilesBtn?.addEventListener('click', () => compressFilesInput.click());
-    selectFolderBtn?.addEventListener('click', () => compressFileInput.click());
-    selectImagesBtn?.addEventListener('click', () => imageCompressInput.click());
-    compressFilesInput?.addEventListener('change', handleCompressFilesSelect);
-    compressFileInput?.addEventListener('change', handleCompressFolderSelect);
-    imageCompressInput?.addEventListener('change', handleImageCompressSelect);
+    listen(selectFilesBtn, 'click', () => compressFilesInput.click());
+    listen(selectFolderBtn, 'click', () => compressFileInput.click());
+    listen(selectImagesBtn, 'click', () => imageCompressInput.click());
+    listen(compressFilesInput, 'change', handleCompressFilesSelect);
+    listen(compressFileInput, 'change', handleCompressFolderSelect);
+    listen(imageCompressInput, 'change', handleImageCompressSelect);
 
     // 压缩质量滑块
-    qualitySlider?.addEventListener('input', (e) => {
+    listen(qualitySlider, 'input', (e) => {
         qualityValue.textContent = e.target.value;
     });
 
-    // 主题切换
-    elements.themeToggle?.addEventListener('click', toggleTheme);
-
-    // 页脚年份
-    if (elements.year) {
-        elements.year.textContent = String(new Date().getFullYear());
-    }
-
-    // 根据当前主题同步切换按钮图标
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const icon = elements.themeToggle?.querySelector('i');
-    if (icon) {
-        icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-        elements.themeToggle?.setAttribute('aria-label', isDark ? '切换到浅色主题' : '切换到深色主题');
-    }
-}
-
-/**
- * 切换深浅主题，并持久化用户选择到 localStorage。
- * 启动时已根据系统偏好或历史选择设置 data-theme，这里只做反转。
- */
-function toggleTheme() {
-    const root = document.documentElement;
-    const current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    const next = current === 'dark' ? 'light' : 'dark';
-
-    root.setAttribute('data-theme', next);
-    localStorage.setItem('yasuo-theme', next);
-
-    const icon = elements.themeToggle?.querySelector('i');
-    if (icon) {
-        icon.className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-        elements.themeToggle.setAttribute('aria-label', next === 'dark' ? '切换到浅色主题' : '切换到深色主题');
-    }
 }
 
 /**
@@ -1173,5 +1368,17 @@ function handleImageCompressSelect(e) {
     if (e.target.files.length) handleImageCompressFiles(e.target.files);
 }
 
-// 页面初始化：DOM 就绪后绑定事件（默认即为压缩模式）
-document.addEventListener('DOMContentLoaded', initEventListeners);
+initEventListeners();
+listen(elements.imageCompressButtons, 'change', syncImageOptions);
+syncImageOptions();
+switchMode(initialMode);
+return {
+    setMode: switchMode,
+    dispose() {
+        disposed = true;
+        generation++;
+        extractedFiles = Object.create(null);
+        listeners.abort();
+    }
+};
+}

@@ -1,0 +1,7 @@
+.image-settings { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px 16px; max-width: 100%; color: var(--text-2); font-size: 13px; }
+.image-settings > label { display: inline-flex; align-items: center; gap: 6px; }
+.image-settings [hidden] { display: none; }
+.image-settings select, .image-settings input[type=number] { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 5px; padding: 5px 6px; }
+.image-settings input[type=number] { width: 6em; }
+.image-settings-note { margin: 0; max-width: 52ch; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+.image-settings .quality-control { flex-wrap: wrap; justify-content: center; max-width: 100%; }
