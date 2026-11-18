@@ -15,10 +15,13 @@ const nav = [['#features','核心能力'],['#workspace','工作台'],['#guide','
 const icons = { extract:'M12 3v11m-4-4 4 4 4-4M4 15v5h16v-5', pack:'M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4 9-4V7m-9 4v10',image:'M3 4h18v16H3zM3 16l6-6 5 5 3-3 4 4M16 8h.01', arrow:'M4 12h16m-6-6 6 6-6 6',ext:'M6 18 18 6M7 6h11v11',moon:'M20 14a8.5 8.5 0 0 1-10-11 9 9 0 1 0 10 11z',sun:'M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',menu:'M3 6h18M3 12h18M3 18h18',close:'m5 5 14 14M19 5 5 19',shield:'m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z',monitor:'M3 4h18v13H3zM8 21h8m-4-4v4',code:'m8 7-5 5 5 5m8-10 5 5-5 5m-3-12-2 14',file:'M5 3h9l5 5v13H5zM14 3v6h5',chevron:'m6 9 6 6 6-6' }
 const alphabet = {A:[14,17,17,31,17,17,17],R:[30,17,17,30,20,18,17],C:[15,16,16,16,16,16,15],H:[17,17,17,31,17,17,17],I:[31,4,4,4,4,4,31],V:[17,17,17,17,17,10,4],E:[31,16,16,30,16,16,31],S:[15,16,16,14,1,1,30],T:[31,4,4,4,4,4,4],U:[17,17,17,17,17,17,14],D:[30,17,17,17,17,17,30],O:[14,17,17,17,17,17,14]}
 const pixels = (word) => [...word].flatMap((c,k) => alphabet[c].flatMap((row,y) => [0,1,2,3,4].map(x => row & (16 >> x) ? `M${k*6+x} ${y}h1v1h-1z` : ''))).join('')
-const dark = ref(false), menu = ref(false), scrolled = ref(false), workspace = ref(null), stars = ref(null)
+const dark = ref(false), menu = ref(false), scrolled = ref(false), workspace = ref(null)
+// 构建时写入的 Star 数作为保底，网络受限时按钮仍能显示数量。
+const bakedStars = typeof __BUILD_STARS__ === 'number' ? __BUILD_STARS__ : null
+const stars = ref(bakedStars)
 const STAR_KEY = 'yasuo-stars'
 const starText = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n)
-// Star 数量只用于展示：缓存六小时，失败时保留纯文字入口，不影响页面其他部分。
+// 优先使用六小时内的缓存，其次请求接口；两者都拿不到就沿用构建时的数字。
 function cachedStars() {
   try {
     const raw = JSON.parse(localStorage.getItem(STAR_KEY) || 'null')
