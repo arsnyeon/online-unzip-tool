@@ -25,7 +25,8 @@ const mode = ref(initialMode || 'extract')
 function selectMode(key) {
   if (mode.value !== key) mode.value = key
   const url = new URL(location.href)
-  url.searchParams.set('mode', key)
+  if (key === 'extract') url.searchParams.delete('mode')
+  else url.searchParams.set('mode', key)
   if (url.hash && url.hash !== '#workspace') url.hash = 'workspace'
   if (url.href !== location.href) history.replaceState(history.state, '', url)
 }
@@ -43,13 +44,21 @@ function navigate(event, target) {
     focusWorkspace()
   }
 }
+// 解压是默认模式，地址里不保留它；其他模式仍可分享。
+function cleanSectionUrl() {
+  const url = new URL(location.href)
+  if (url.searchParams.get('mode') === 'extract' && url.hash !== '#workspace') {
+    url.searchParams.delete('mode')
+    history.replaceState(history.state, '', url)
+  }
+}
 function theme(v){dark.value=v;document.documentElement.dataset.theme=v?'dark':'light'}
 function toggleTheme(){theme(!dark.value);try{localStorage.setItem('yasuo-theme',dark.value?'dark':'light')}catch{}}
 function scroll(){scrolled.value=window.scrollY>12}
 function storage(e){if(e.key==='yasuo-theme')theme(e.newValue==='dark')}
 function key(e){if(e.key==='Escape'&&menu.value){menu.value=false; document.getElementById('menu-toggle')?.focus()}}
-onMounted(()=>{try{theme((localStorage.getItem('yasuo-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark')}catch{}if(initialMode || location.hash==='#workspace')focusWorkspace();scroll();window.addEventListener('scroll',scroll,{passive:true});window.addEventListener('keydown',key);window.addEventListener('storage',storage)})
-onBeforeUnmount(()=>{window.removeEventListener('scroll',scroll);window.removeEventListener('keydown',key);window.removeEventListener('storage',storage)})
+onMounted(()=>{try{theme((localStorage.getItem('yasuo-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark')}catch{}cleanSectionUrl();window.addEventListener('hashchange',cleanSectionUrl);if((initialMode && !location.hash) || location.hash==='#workspace')focusWorkspace();scroll();window.addEventListener('scroll',scroll,{passive:true});window.addEventListener('keydown',key);window.addEventListener('storage',storage)})
+onBeforeUnmount(()=>{window.removeEventListener('hashchange',cleanSectionUrl);window.removeEventListener('scroll',scroll);window.removeEventListener('keydown',key);window.removeEventListener('storage',storage)})
 </script>
 <template>
   <svg class="defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
@@ -66,7 +75,7 @@ onBeforeUnmount(()=>{window.removeEventListener('scroll',scroll);window.removeEv
   </defs></svg>
   <a class="skip" href="#main">跳到主要内容</a>
   <header :class="{ solid:scrolled || menu }"><div class="shell navrow"><a href="#top" class="brand" @click="menu=false"><svg aria-hidden="true"><use href="#parcel"/></svg><span><b>yasuo</b>.zip</span></a><span class="mini-tag">local first</span>
-    <nav class="wide-nav" aria-label="主导航"><a v-for="[url,label] in nav" :href="url" :key="url" @click="navigate($event,url)">{{label}}</a></nav><div class="nav-actions"><a class="source" href="https://github.com/arsnyeon/online-unzip-tool" target="_blank" rel="noreferrer">GitHub <svg><use href="#i-ext"/></svg></a><button class="square" @click="toggleTheme" :aria-label="dark?'切换为浅色主题':'切换为深色主题'" :title="dark?'浅色主题':'深色主题'"><svg><use :href="dark?'#i-sun':'#i-moon'"/></svg></button><a class="nav-primary" href="#workspace" @click.prevent="focusWorkspace()">打开工具 <svg><use href="#i-arrow"/></svg></a><button id="menu-toggle" class="square menu-toggle" @click="menu=!menu" aria-controls="mobile-nav" :aria-expanded="menu" aria-label="导航菜单"><svg><use :href="menu?'#i-close':'#i-menu'"/></svg></button></div></div>
+    <nav class="wide-nav" aria-label="主导航"><a v-for="[url,label] in nav" :href="url" :key="url" @click="navigate($event,url)">{{label}}</a></nav><div class="nav-actions"><button class="square" @click="toggleTheme" :aria-label="dark?'切换为浅色主题':'切换为深色主题'" :title="dark?'浅色主题':'深色主题'"><svg><use :href="dark?'#i-sun':'#i-moon'"/></svg></button><a class="nav-primary" href="https://github.com/arsnyeon/online-unzip-tool" target="_blank" rel="noreferrer">GitHub <svg aria-hidden="true"><use href="#i-ext"/></svg></a><button id="menu-toggle" class="square menu-toggle" @click="menu=!menu" aria-controls="mobile-nav" :aria-expanded="menu" aria-label="导航菜单"><svg><use :href="menu?'#i-close':'#i-menu'"/></svg></button></div></div>
     <nav v-if="menu" id="mobile-nav" aria-label="移动导航"><a v-for="[url,label] in nav" :href="url" :key="url" @click="navigate($event,url)">{{label}}</a><a href="#workspace" @click.prevent="focusWorkspace()">打开工具</a></nav>
   </header>
   <main id="main"><section id="top"><div class="hero shell"><div class="intro">
