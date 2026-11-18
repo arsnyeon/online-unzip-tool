@@ -3,6 +3,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # 定时重建，让页面里写入的 Star 数跟上仓库变化；时间取 UTC。
+  schedule:
+    - cron: '17 3 * * *'
+  # 有人点星时立即重建，不必等到第二天。
+  watch:
+    types: [started]
 permissions:
   contents: read
   pages: write
@@ -21,6 +27,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # 让构建阶段能读仓库 Star 数；未提供时构建会自动退回接口请求。
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

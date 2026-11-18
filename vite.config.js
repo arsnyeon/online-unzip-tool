@@ -9,9 +9,12 @@ const staticFiles = [ 'js/libarchive-worker-shim.js', 'logo.png', 'favicon.ico',
 // the GitHub API. The page still refreshes it at runtime when the API is reachable.
 async function buildStars() {
   try {
+    const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'yasuo-zip-build' }
+    // 在 CI 中带令牌，避免共享出口 IP 触发未认证请求的限流。
+    if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
     const res = await fetch('https://api.github.com/repos/arsnyeon/online-unzip-tool', {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'yasuo-zip-build' },
-      signal: AbortSignal.timeout(5000),
+      headers,
+      signal: AbortSignal.timeout(8000),
     })
     if (!res.ok) return null
     const count = (await res.json()).stargazers_count
