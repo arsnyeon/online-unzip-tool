@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="yasuo.zip - 本地优先的在线解压缩工具">
+  <rect width="1200" height="400" fill="#F7F8FA"/>
+  <g opacity="0.5" stroke="#5B8DEF" stroke-width="1">
+    <path d="M0 340 H1200"/><path d="M0 60 H1200"/>
+  </g>
+  <text x="600" y="120" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="600" fill="#5B8DEF">免费 · 本地处理 · 无需注册</text>
+  <text x="600" y="220" text-anchor="middle" font-family="sans-serif" font-size="64" font-weight="700" fill="#242A33">把压缩包摊开，把文件收好</text>
+  <text x="600" y="280" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#5D6673">ZIP · RAR · 7Z · GZ · TAR · BZ2 · XZ　一站式本地解压</text>
+  <g transform="translate(150,330)">
+    <rect x="0" y="0" width="900" height="40" rx="8" fill="#FFFFFF" stroke="#E2E6EC"/>
+    <circle cx="24" cy="20" r="5" fill="#5B8DEF"/>
+    <text x="44" y="26" font-family="monospace" font-size="14" fill="#8A93A1">local://browser　✓ files never leave your device</text>
+  </g>
+</svg>

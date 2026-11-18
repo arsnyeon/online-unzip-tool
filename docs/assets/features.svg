@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="340" viewBox="0 0 900 340" role="img" aria-label="三种模式：解压、压缩、图片压缩">
+  <rect width="900" height="340" rx="12" fill="#F7F8FA"/>
+  <g font-family="sans-serif">
+    <text x="450" y="42" text-anchor="middle" font-size="20" font-weight="600" fill="#242A33">一个页面，三种模式</text>
+    <!-- 解压 -->
+    <g transform="translate(40,70)">
+      <rect width="250" height="230" rx="10" fill="#FFFFFF" stroke="#E2E6EC"/>
+      <rect x="18" y="18" width="40" height="40" rx="8" fill="#EEF3FE"/>
+      <text x="38" y="45" text-anchor="middle" font-size="18" fill="#5B8DEF">▤</text>
+      <text x="18" y="88" font-size="16" font-weight="600" fill="#242A33">解压</text>
+      <text x="18" y="118" font-size="13" fill="#5D6673">ZIP / RAR / 7Z / GZ</text>
+      <text x="18" y="140" font-size="13" fill="#5D6673">TAR / BZ2 / XZ</text>
+      <text x="18" y="170" font-size="12" fill="#2E9E6B">✓ 加密包可解</text>
+      <text x="18" y="194" font-size="12" fill="#5D6673">文件列表 · 单个/全部下载</text>
+    </g>
+    <!-- 压缩 -->
+    <g transform="translate(325,70)">
+      <rect width="250" height="230" rx="10" fill="#FFFFFF" stroke="#E2E6EC"/>
+      <rect x="18" y="18" width="40" height="40" rx="8" fill="#EEF3FE"/>
+      <text x="38" y="45" text-anchor="middle" font-size="18" fill="#5B8DEF">▣</text>
+      <text x="18" y="88" font-size="16" font-weight="600" fill="#242A33">压缩</text>
+      <text x="18" y="118" font-size="13" fill="#5D6673">多文件或文件夹</text>
+      <text x="18" y="140" font-size="13" fill="#5D6673">→ 一个 ZIP 包</text>
+      <text x="18" y="170" font-size="12" fill="#2E9E6B">✓ 保留目录结构</text>
+      <text x="18" y="194" font-size="12" fill="#5D6673">DEFLATE 压缩</text>
+    </g>
+    <!-- 图片 -->
+    <g transform="translate(610,70)">
+      <rect width="250" height="230" rx="10" fill="#FFFFFF" stroke="#E2E6EC"/>
+      <rect x="18" y="18" width="40" height="40" rx="8" fill="#EEF3FE"/>
+      <text x="38" y="45" text-anchor="middle" font-size="18" fill="#5B8DEF">▧</text>
+      <text x="18" y="88" font-size="16" font-weight="600" fill="#242A33">图片压缩</text>
+      <text x="18" y="118" font-size="13" fill="#5D6673">JPEG / PNG / WebP</text>
+      <text x="18" y="140" font-size="13" fill="#5D6673">质量 10% – 100%</text>
+      <text x="18" y="170" font-size="12" fill="#2E9E6B">✓ 显示压缩率</text>
+      <text x="18" y="194" font-size="12" fill="#5D6673">批量处理 · 保持格式</text>
+    </g>
+  </g>
+</svg>

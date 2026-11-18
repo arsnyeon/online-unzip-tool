@@ -2,200 +2,206 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>在线解压缩工具 - 免费ZIP/GZ/TAR解压+图片压缩 | yasuo.zip</title>
-    <meta name="description" content="免费在线压缩包解压工具，支持ZIP、GZ、TAR格式解压、文件压缩和图片压缩。无需安装软件，纯浏览器操作，文件本地处理保证安全。支持批量解压、图片压缩、文件预览、单独下载，是办公学习的必备工具。" />
-    <meta name="keywords" content="在线解压,ZIP解压,压缩包解压,文件压缩,在线压缩,图片压缩,GZ解压,TAR解压,免费解压工具,在线工具,文件处理,图片优化" />
-    <meta name="author" content="ArsnYeon" />
-    <meta name="robots" content="index, follow" />
-    <meta name="googlebot" content="index, follow" />
-    <meta name="baiduspider" content="index, follow" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>yasuo.zip — 本地优先的在线解压缩工具</title>
+    <meta name="description" content="免费在线压缩包解压工具，支持 ZIP、RAR、7Z、GZ、TAR、BZ2、XZ 格式解压，含加密压缩包；文件压缩与图片压缩。纯浏览器本地处理，文件永不上传。">
+    <meta name="keywords" content="在线解压,ZIP解压,RAR解压,7Z解压,压缩包解压,文件压缩,在线压缩,图片压缩,GZ解压,TAR解压,BZ2解压,XZ解压,加密解压,本地解压,在线工具,免费工具">
+    <meta name="author" content="ArsnYeon">
+    <meta name="theme-color" content="#5B8DEF">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
     <link rel="apple-touch-icon" href="favicon.ico">
     <link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+
+    <!-- 提前应用主题，避免深浅色切换时闪屏 -->
+    <script>
+        (function () {
+            const saved = localStorage.getItem('yasuo-theme');
+            const theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" crossorigin="anonymous"></script>
-	<script charset="UTF-8" id="LA_COLLECT" src="https://sdk.51.la/js-sdk-pro.min.js"></script>
-	<script>LA.init({id:"KtYXyLyHpzTmmxxZ",ck:"KtYXyLyHpzTmmxxZ",autoTrack:true,hashMode:true,screenRecord:true})</script>
+    <!-- libarchive.js：WASM 多格式引擎（RAR/7Z/BZ2/XZ/加密包），通过同源 shim 加载 CDN -->
+    <script type="module">
+        import { Archive } from 'https://cdn.jsdelivr.net/npm/libarchive.js@2.0.2/dist/libarchive.js';
+        Archive.init({ workerUrl: 'js/libarchive-worker-shim.js' });
+        window.LibArchive = Archive;
+    </script>
+    <script charset="UTF-8" id="LA_COLLECT" src="https://sdk.51.la/js-sdk-pro.min.js" defer></script>
+    <script>
+        window.addEventListener('load', function () {
+            if (window.LA) {
+                LA.init({ id: 'KtYXyLyHpzTmmxxZ', ck: 'KtYXyLyHpzTmmxxZ', autoTrack: true, hashMode: true, screenRecord: true });
+            }
+        });
+    </script>
 </head>
 <body>
-    <a href="https://github.com/arsnyeon/online-unzip-tool" target="_blank" class="github-corner" title="访问GitHub">
-        <svg width="80" height="80" viewBox="0 0 250 250">
-            <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z" fill="#000"></path>
-            <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="white" class="octo-arm"></path>
-            <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="white" class="octo-body"></path>
-        </svg>
-    </a>
-    
-    <div class="container">
-        <header role="banner">
-            <div class="logo">
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="在线解压缩工具图标">
-                    <rect width="48" height="48" rx="12" fill="url(#gradient)" />
-                    <defs>
-                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#007AFF;stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:#5856D6;stop-opacity:1" />
-                        </linearGradient>
-                    </defs>
-                    <rect x="12" y="10" width="24" height="28" rx="2" fill="white" fill-opacity="0.9"/>
-                    <path d="M12 10 L12 8 C12 6.9 12.9 6 14 6 L18 6 L20 8 L34 8 C35.1 8 36 8.9 36 10 L36 12 L12 12 Z" fill="white"/>
-                    <rect x="22" y="14" width="4" height="2" fill="#007AFF"/>
-                    <rect x="22" y="18" width="4" height="2" fill="#007AFF"/>
-                    <rect x="22" y="22" width="4" height="2" fill="#007AFF"/>
-                    <rect x="22" y="26" width="4" height="2" fill="#007AFF"/>
-                    <rect x="22" y="30" width="4" height="2" fill="#007AFF"/>
-                    <circle cx="24" cy="34" r="2" fill="#007AFF"/>
-                    <rect x="23" y="32" width="2" height="3" fill="#007AFF"/>
-                    <path d="M16 16 L20 20 L16 24" stroke="#007AFF" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M32 16 L28 20 L32 24" stroke="#007AFF" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <h1>免费在线解压缩工具</h1>
+    <div class="app-shell">
+        <!-- 顶部状态行 -->
+        <div class="statusbar" role="status" aria-label="工具状态">
+            <div class="statusbar-left">
+                <span class="status-brand"><span class="brand-mark" aria-hidden="true">YZ</span> yasuo.zip</span>
+                <span class="status-sep" aria-hidden="true">·</span>
+                <span><i class="fas fa-shield-halved" aria-hidden="true"></i> 本地处理</span>
+                <span class="status-sep" aria-hidden="true">·</span>
+                <span class="status-formats">ZIP / RAR / 7Z / GZ / TAR / BZ2 / XZ</span>
             </div>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深浅主题" title="切换深浅主题">
+                <i class="fas fa-moon" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <header class="hero" role="banner">
+            <div class="hero-badge">免费 · 无需注册 · 文件不离开浏览器</div>
+            <h1>把压缩包<span class="accent">摊开</span>，把文件<span class="accent">收好</span>。</h1>
+            <p>解压缩、打包、压图片。一个页面，本地完成。</p>
+            <a class="hero-source" href="https://github.com/arsnyeon/online-unzip-tool" target="_blank" rel="noopener">
+                <i class="fab fa-github" aria-hidden="true"></i> 查看源码
+            </a>
         </header>
 
-        <main role="main">
-            <div style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;">
-                <h2>在线解压缩工具功能介绍</h2>
-                <p>本工具是一款专业的在线压缩包解压工具，支持ZIP解压、GZ解压、TAR解压等多种格式。用户可以直接在浏览器中解压压缩包，无需下载安装任何软件。同时支持文件压缩功能，可以将多个文件或文件夹压缩成ZIP格式。此外，还提供专业的图片压缩功能，支持JPG、PNG、WebP等格式的图片优化压缩。所有文件处理都在本地完成，确保文件安全和隐私保护。</p>
-                <h3>支持的压缩格式</h3>
-                <ul>
-                    <li>ZIP格式解压 - 最常用的压缩格式，完全兼容</li>
-                    <li>GZ格式解压 - Gzip压缩格式，支持单文件解压</li>
-                    <li>TAR格式解压 - Unix/Linux归档格式</li>
-                </ul>
-                <h3>图片压缩功能</h3>
-                <ul>
-                    <li>支持JPG、PNG、WebP格式图片压缩</li>
-                    <li>可调节压缩质量，平衡文件大小与图片质量</li>
-                    <li>批量图片压缩，提高工作效率</li>
-                    <li>保持原始图片格式，无需格式转换</li>
-                </ul>
-                <h3>主要特性</h3>
-                <ul>
-                    <li>免费使用，无需注册</li>
-                    <li>支持拖拽上传</li>
-                    <li>文件本地处理，保护隐私</li>
-                    <li>支持批量解压、压缩和图片优化</li>
-                    <li>响应式设计，支持移动设备</li>
-                </ul>
-            </div>
-            <nav class="toolbar" role="navigation" aria-label="功能选择">
-                <button class="tool-btn active" id="compress-btn" aria-pressed="true" aria-describedby="compress-desc">
-                    <i class="fas fa-file-archive" aria-hidden="true"></i>
-                    <span>压缩文件</span>
+        <!-- SEO 辅助内容，视觉隐藏、对搜索引擎可读 -->
+        <div class="sr-only">
+            <h2>在线解压缩工具功能介绍</h2>
+            <p>本工具支持 ZIP、RAR、7Z、GZ、TAR、BZ2、XZ 格式解压以及 RAR/7Z 加密压缩包，纯浏览器本地处理，支持文件压缩与 JPEG、PNG、WebP 图片压缩。</p>
+            <ul>
+                <li>ZIP 格式解压 - 完全兼容</li>
+                <li>RAR 格式解压 - 支持 RAR4/RAR5 及加密包</li>
+                <li>7Z 格式解压 - 高压缩率及加密包</li>
+                <li>GZ / TAR / BZ2 / XZ 格式解压</li>
+                <li>文件压缩与图片压缩</li>
+            </ul>
+        </div>
+
+        <main role="main" class="workspace">
+            <nav class="toolbar" role="tablist" aria-label="功能选择">
+                <button class="tool-btn active" id="compress-btn" role="tab" aria-selected="true" aria-pressed="true" aria-describedby="compress-desc" type="button">
+                    <i class="fas fa-file-zipper" aria-hidden="true"></i><span>压缩文件</span>
                 </button>
-                <button class="tool-btn" id="extract-btn" aria-pressed="false" aria-describedby="extract-desc">
-                    <i class="fas fa-folder-open" aria-hidden="true"></i>
-                    <span>解压文件</span>
+                <button class="tool-btn" id="extract-btn" role="tab" aria-selected="false" aria-pressed="false" aria-describedby="extract-desc" type="button">
+                    <i class="fas fa-folder-open" aria-hidden="true"></i><span>解压文件</span>
                 </button>
-                <button class="tool-btn" id="image-compress-btn" aria-pressed="false" aria-describedby="image-compress-desc">
-                    <i class="fas fa-image" aria-hidden="true"></i>
-                    <span>图片压缩</span>
+                <button class="tool-btn" id="image-compress-btn" role="tab" aria-selected="false" aria-pressed="false" aria-describedby="image-compress-desc" type="button">
+                    <i class="fas fa-image" aria-hidden="true"></i><span>图片压缩</span>
                 </button>
             </nav>
-            <div style="position: absolute; left: -9999px;">
-                <div id="compress-desc">将多个文件或文件夹压缩成ZIP格式</div>
-                <div id="extract-desc">解压ZIP、GZ、TAR格式的压缩包</div>
+            <div class="sr-only">
+                <div id="compress-desc">将多个文件或文件夹压缩成 ZIP 格式</div>
+                <div id="extract-desc">解压 ZIP、RAR、7Z、GZ、TAR、BZ2、XZ 格式，支持加密压缩包</div>
+                <div id="image-compress-desc">压缩 JPEG、PNG、WebP 图片，可调节质量</div>
             </div>
 
-            <section class="upload-section" id="upload-section" aria-labelledby="upload-title">
-                <div class="upload-container" id="drop-area" role="button" tabindex="0" aria-describedby="upload-description">
-                    <div class="upload-icon" id="upload-icon" aria-hidden="true">
+            <section class="panel upload-section" id="upload-section" aria-labelledby="upload-title">
+                <div class="panel-head">
+                    <div class="panel-index" aria-hidden="true">01</div>
+                    <div>
+                        <h2 id="upload-title">选择文件进行压缩</h2>
+                        <p class="panel-sub" id="upload-description">拖拽文件到此处，或点击按钮选择（最大 500MB）</p>
+                    </div>
+                </div>
+
+                <div class="dropzone" id="drop-area" role="button" tabindex="0" aria-describedby="upload-description">
+                    <div class="drop-icon" id="upload-icon" aria-hidden="true">
                         <i class="fas fa-folder-open" id="extract-icon"></i>
-                        <i class="fas fa-file-archive" id="compress-icon"></i>
+                        <i class="fas fa-file-zipper" id="compress-icon"></i>
                         <i class="fas fa-image" id="image-compress-icon"></i>
                     </div>
-                    <h2 id="upload-title">选择文件进行压缩</h2>
-                    <p id="upload-description">拖拽文件到此处上传<br>(支持多种文件格式，最大500MB)</p>
-                    <input type="file" id="file-input" accept=".zip,.gz,.tar" hidden aria-label="选择压缩文件">
+                    <p class="drop-hint" id="drop-hint">把文件拖到这里</p>
+
+                    <input type="file" id="file-input" accept=".zip,.rar,.7z,.gz,.tar,.bz2,.xz,.tgz,.tar.gz,.tar.bz2,.tar.xz" hidden aria-label="选择压缩文件">
                     <input type="file" id="compress-file-input" multiple webkitdirectory hidden aria-label="选择文件夹">
                     <input type="file" id="compress-files-input" multiple hidden aria-label="选择多个文件">
                     <input type="file" id="image-compress-input" multiple accept="image/*" hidden aria-label="选择要压缩的图片">
-                    <div class="upload-buttons" id="upload-buttons">
-                        <button class="upload-btn" id="upload-btn" aria-describedby="upload-description">选择文件</button>
+
+                    <div class="password-option" id="password-option" style="display: none;">
+                        <label for="archive-password"><i class="fas fa-lock" aria-hidden="true"></i> 解压密码（加密文件才需填写）</label>
+                        <input type="password" id="archive-password" autocomplete="off" placeholder="留空表示无密码">
                     </div>
-                    <div class="compress-buttons" id="compress-buttons">
-                        <button class="upload-btn" id="select-files-btn" aria-label="选择要压缩的文件">选择文件</button>
-                        <button class="upload-btn secondary" id="select-folder-btn" aria-label="选择要压缩的文件夹">选择文件夹</button>
+
+                    <div class="action-row upload-buttons" id="upload-buttons">
+                        <button class="btn btn-primary" id="upload-btn" type="button"><i class="fas fa-folder-open" aria-hidden="true"></i> 选择压缩文件</button>
                     </div>
-                    <div class="image-compress-buttons" id="image-compress-buttons">
-                        <button class="upload-btn" id="select-images-btn" aria-label="选择要压缩的图片">选择图片</button>
-                        <div class="compress-options">
-                            <label for="quality-slider">压缩质量: <span id="quality-value">30</span>%</label>
-                            <input type="range" id="quality-slider" min="10" max="100" value="30" class="quality-slider">
+                    <div class="action-row compress-buttons" id="compress-buttons">
+                        <button class="btn btn-primary" id="select-files-btn" type="button"><i class="fas fa-file-plus" aria-hidden="true"></i> 选择文件</button>
+                        <button class="btn btn-ghost" id="select-folder-btn" type="button"><i class="fas fa-folder-plus" aria-hidden="true"></i> 选择文件夹</button>
+                    </div>
+                    <div class="action-row image-compress-buttons" id="image-compress-buttons">
+                        <button class="btn btn-primary" id="select-images-btn" type="button"><i class="fas fa-image" aria-hidden="true"></i> 选择图片</button>
+                        <div class="quality-control">
+                            <label for="quality-slider">压缩质量 <output id="quality-value">30</output>%</label>
+                            <input type="range" id="quality-slider" min="10" max="100" value="30" class="quality-slider" aria-label="压缩质量">
                         </div>
                     </div>
                 </div>
+                <div class="panel-foot">
+                    <span><i class="fas fa-lock" aria-hidden="true"></i> 全程本地</span>
+                    <span><i class="fas fa-bolt" aria-hidden="true"></i> 常用格式秒开</span>
+                    <span><i class="fas fa-box-archive" aria-hidden="true"></i> 加密包可解</span>
+                </div>
             </section>
 
-            <section class="processing-section" id="processing-section" aria-live="polite" aria-labelledby="processing-text">
-                <div class="progress-container">
-                    <h2 id="processing-text">正在压缩中...</h2>
-                    <div class="progress-bar-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-describedby="progress-text">
+            <section class="panel processing-section" id="processing-section" aria-live="polite" aria-labelledby="processing-text" style="display: none;">
+                <div class="panel-head">
+                    <div class="panel-index" aria-hidden="true">02</div>
+                    <div><h2 id="processing-text">正在处理…</h2><p class="panel-sub">文件没有上传，请稍候</p></div>
+                </div>
+                <div class="progress-wrap">
+                    <div class="progress-bar-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                         <div class="progress-bar" id="progress-bar"></div>
                     </div>
-                    <p id="progress-text">0%</p>
+                    <output id="progress-text">0%</output>
                 </div>
             </section>
 
-            <section class="result-section" id="result-section" aria-labelledby="result-title">
-                <header class="result-header">
-                    <h2 id="result-title">处理结果</h2>
-                    <div class="file-info" aria-live="polite">
-                        <span id="file-name">未选择文件</span>
-                        <span id="file-size"></span>
+            <section class="panel result-section" id="result-section" aria-labelledby="result-title" style="display: none;">
+                <div class="panel-head result-head">
+                    <div class="panel-index" aria-hidden="true">03</div>
+                    <div class="result-meta">
+                        <h2 id="result-title">处理结果</h2>
+                        <p class="panel-sub"><span id="file-name">未选择文件</span> <span id="file-size"></span></p>
                     </div>
-                    <button class="download-all-btn" id="download-all-btn" aria-label="下载所有文件">
-                        <i class="fas fa-download" aria-hidden="true"></i> 下载全部
-                    </button>
-                </header>
-                
-                <div class="file-explorer" role="region" aria-label="文件列表">
+                    <button class="btn btn-download" id="download-all-btn" type="button"><i class="fas fa-download" aria-hidden="true"></i> 下载全部</button>
+                </div>
+                <div class="file-explorer" role="region" aria-label="结果文件列表">
                     <div class="file-list-header" role="row">
-                        <div class="file-name-header" role="columnheader">文件名</div>
-                        <div class="file-size-header" role="columnheader">大小</div>
-                        <div class="file-action-header" role="columnheader">操作</div>
+                        <span role="columnheader">文件名</span>
+                        <span role="columnheader">大小</span>
+                        <span role="columnheader" class="action-header">操作</span>
                     </div>
-                    <div class="file-list" id="file-list" role="grid" aria-label="解压后的文件列表">
-                    </div>
+                    <div class="file-list" id="file-list" role="grid" aria-label="文件列表"></div>
                 </div>
             </section>
-
         </main>
 
-        <div class="error-popup" id="error-popup" role="dialog" aria-labelledby="error-title" aria-describedby="error-message" aria-hidden="true">
+        <div class="error-popup" id="error-popup" role="dialog" aria-modal="true" aria-labelledby="error-title" aria-describedby="error-message" aria-hidden="true">
             <div class="error-content">
-                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                <h3 id="error-title">错误提示</h3>
+                <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+                <h3 id="error-title">出了点问题</h3>
                 <p id="error-message"></p>
-                <button id="error-close" aria-label="关闭错误提示">确定</button>
+                <button class="btn btn-primary" id="error-close" type="button">知道了</button>
             </div>
         </div>
 
         <aside class="friend-links" role="complementary">
-            <div class="friend-links-container">
-                <h3>相关工具推荐：</h3>
-                <nav class="friend-links-list" aria-label="友情链接">
-                    <a target="_blank" href="https://net.arsn.cn/" class="friend-link" rel="noopener">FlowLoss - 网络工具</a>
-                    <span class="link-divider" aria-hidden="true">|</span>
-                    <a target="_blank" href="https://murk.xiaojieapi.com/" class="friend-link" rel="noopener">MurkPHP - 开发工具</a>
-                </nav>
-            </div>
+            <span>相关工具</span>
+            <a href="https://net.arsn.cn/" target="_blank" rel="noopener">FlowLoss · 网络工具</a>
+            <span class="dot" aria-hidden="true">·</span>
+            <a href="https://murk.xiaojieapi.com/" target="_blank" rel="noopener">MurkPHP · 开发工具</a>
         </aside>
 
         <footer role="contentinfo">
-            <p>
-                <small>
-                    关键词：在线解压、ZIP解压、压缩包解压、文件压缩、图片压缩、在线工具、免费解压工具、图片优化
-                    <br>
-                    本站提供专业的在线压缩包解压和图片压缩服务，支持ZIP、GZ、TAR等主流格式解压，以及JPEG、PNG、WebP图片压缩优化，是您处理压缩文件和图片优化的最佳选择。
-                </small>
-            </p>
-            <p>© <script>document.write(new Date().getFullYear());</script> 在线解压缩工具 yasuo.zip | 所有文件处理均在本地完成，确保您的文件安全</p>
+            <span>© <span id="year">2026</span> yasuo.zip · 所有文件处理均在本地完成</span>
+            <span class="footer-links">
+                <a href="https://github.com/arsnyeon/online-unzip-tool" target="_blank" rel="noopener">GitHub</a>
+                <a href="https://github.com/arsnyeon/online-unzip-tool/issues" target="_blank" rel="noopener">反馈</a>
+            </span>
         </footer>
     </div>
 
